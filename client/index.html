@@ -6,24 +6,156 @@
   <title>Profesorjand Chat</title>
   <script type="module">
     import {io} from "https://cdn.socket.io/4.3.2/socket.io.esm.min.js"
-    const socket =io();
+    const socket =io({
+      auth:{
+        username:nombre
+      }
+    });
 
-    const form = document.getElementById("form");
+    const botonEnviarMensaje = document.getElementById("botonEnviarMensaje");
     const input = document.getElementById("input");
     const messages = document.getElementById("messages");
+    const chat = document.getElementById("chat")
+    const login = document.getElementById("accept");
+    const panelLogin = document.getElementById("logginPanel");
 
-    socket.on("chat message", (msg) =>{
-      const item = `<li>${msg}</li>`
-      messages.insertAdjacentHTML("beforeend",item)
+    chat.style.display = "none";
+    panelLogin.style.display = "none";
+
+    socket.on('connect', (io) => {
+      console.log('Bienvenido a la Applicación de Mensajeria de ProfesorJAND');
+      
     })
 
-    form.addEventListener("submit", (e)=>{
+    socket.on("historial",(historial)=>{
+      historial.forEach(({msg,usuario, bgColor, textColor, tiempo})=>{
+        createMessage({msg, textColor , bgColor, usuario, tiempo})
+
+      })
+    })
+
+    socket.on("chat message", ({msg, textColor , bgColor, usuario, tiempo} ) =>{
+      createMessage({msg, textColor , bgColor, usuario, tiempo})
+      socket.emit("historial",()=>{
+        historial.push(msg);
+        console.log(historial);
+      })
+      
+    })
+
+    socket.on("usuario",(usuario)=>{
+      console.log(usuario)
+    })
+
+    //agregar lista de usuario a la funcion logginUserPanel
+    socket.on("new user message", ({usuario, login, listaUsuario})=>{
+      loggingMessage({usuario, login})
+    })
+
+    socket.on("list of users", (usuariosConectados)=>{
+      logginUserPanel(usuariosConectados)
+    })
+
+    function loggingMessage({usuario, login}){
+    
+      let textnode;
+      const item = document.createElement("li");
+      console.log("usuario", usuario)
+      console.log("login", login)
+      if(login){
+        textnode = document.createTextNode(`${usuario} ha entrado a la sala`);
+        console.log(`${usuario} ha entrado a la sala`)
+      }else{
+        textnode = document.createTextNode(`${usuario} ha abandonado la sala`);
+        console.log(`${usuario} ha abandonado la sala`)
+        
+      }
+      
+      item.style.color = login ? "white": "red";
+      item.style.backgroundColor = "black";
+      item.style.display = "flex";
+      item.style.width = "80%";
+      item.style.justifyContent= "center";
+      item.style.alignItems= "center";
+      item.style.position= "relative";
+      item.style.left= 0;
+      item.style.right= 0;
+      item.style.margin= "auto";
+      item.style.fontSize= "0.6rem";
+      item.appendChild(textnode);
+      messages.appendChild(item);
+      
+    }
+
+    function logginUserPanel(usuariosConectados){
+      panelLogin.innerHTML = '';
+      usuariosConectados.forEach((user)=>{
+        const item = document.createElement("li");
+        const textnode = document.createTextNode(user);
+        item.style.color = login ? "white": "red";
+        item.style.backgroundColor = "black";
+        item.style.display = "flex";
+        item.style.width = "80%";
+        item.style.justifyContent= "center";
+        item.style.alignItems= "center";
+        item.style.position= "relative";
+        item.style.left= 0;
+        item.style.right= 0;
+        item.style.fontSize= "1rem";
+        item.appendChild(textnode);
+        panelLogin.appendChild(item)
+      })
+    }
+
+    function createMessage({msg, textColor , bgColor, usuario, tiempo}){
+      const item = document.createElement("li");
+      const vistaNombre = document.createElement("p");
+      const textnode = document.createTextNode(msg);
+      const insertarNomnbre = document.createTextNode(usuario + " - " + tiempo)
+      item.style.color = textColor;
+      item.style.backgroundColor = bgColor;
+      vistaNombre.appendChild(insertarNomnbre);
+      item.appendChild(vistaNombre)
+      item.appendChild(textnode);
+      messages.appendChild(item);
+      console.log("mensaje creado exitosamente")
+    }
+
+    botonEnviarMensaje.addEventListener("click", (e)=>{
       e.preventDefault();
       if(input.value){
-        socket.emit("chat message",input.value)
+        const usuario = document.getElementById("nombreInicio").value;
+        const date = new Date();
+        const minutes = date.getMinutes();
+        const hour = date.getHours();
+        const tiempo = hour + ":" + minutes;
+        const textColor = document.getElementById("textColor").value;
+        const bgColor = document.getElementById("backgroundColor").value;
+        console.log("input.value",input.value, "inputMessageColor",inputMessage.style.color, "inputMessageBG", inputMessage.style.backgroundColor, tiempo)
+        socket.emit("chat message",{msg:input.value, textColor, bgColor, usuario, tiempo})
         input.value=""
       }
     })
+
+    login.addEventListener("click",(e)=>{
+      console.log("hizo click")
+      e.preventDefault();
+
+      const usuario = document.getElementById("nombreInicio").value;
+      document.getElementById("nombre").value = usuario;
+
+      socket.emit("usuario",usuario)
+      const modal = document.getElementById("modal");
+      modal.style.display = "none";
+      chat.style.display = "block";
+      panelLogin.style.display = "flex";
+      socket.emit("new user message",{usuario, login:true})
+      socket.emit("list of users",{usuario})   
+                  
+    })  
+
+
+    
   </script>
   <style>
     *,
@@ -36,11 +168,32 @@
 }
     body{
       margin:0;
-      display: grid;
+      display: flex;
+      flex-direction: row;
       place-content: center;
+      align-items:center;
+      background-color: #eee;
       height: 100vh;
-      padding: 36px 36px 100px 36px;
       grid-template-rows: 1fr;
+    }
+    #modal{
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      position: static;
+      z-index: 5;
+      background-color: #09f;
+    }
+    #introducirNombre{
+      display: flex;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin: auto;
+      align-items: center;
+      justify-content: center;
     }
     #chat {
       border: 1px solid #ccc;
@@ -49,8 +202,15 @@
       width: 350px;
       height: 100%;
       position: relative;
-    }
+      background-color: rgba(0, 0, 0, 0.041);
 
+    }
+    #chat > div{
+      width: 100%;
+      height: 80%;
+      overflow-y : auto; 
+      display: block;
+    }
     #form{
       bottom:0;
       display: flex;
@@ -84,22 +244,136 @@
       list-style-type: none;
       margin: 0;
       padding: 0;
+      gap: 5px;
+    display: flex;
+    flex-direction: column;
+    margin: 0px 5px;
     }
     #messages > li {
       padding: .5rem 1rem;
+      white-space: pre-line;
+      border-radius: 5px;
+    
     }
     #messages > li:nth-child(odd){
       background-color: #0cf;
     }
+ 
+    
+    #formchat{
+      background-color: rgba(0, 0, 0, 0.11) !important; 
+      height: 200px;
+      display: block;
+    }
+    li > p {
+      margin: 0px;
+      font-size: 10px;
+      border-bottom: 1px solid;
+      margin-bottom: 3px
+    }
+
+    #BorderlogginPanel{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #logginPanel{
+      width: 300px;
+      height: 50%;
+      background: #ccc;
+      flex-direction: column;
+      align-items: center;
+      padding:20px;
+      gap:10px
+    }
+    input[type="color"] {
+	    -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      border: none;
+      width: 15px;
+      height: 15px;
+      cursor:pointer;
+      background-color: transparent;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+    
   </style>
 </head>
 <body>
+  <section id="modal">
+    <div id="introducirNombre">
+      <label for="nombre">Nombre: 
+        <input type="text" id="nombreInicio" name="nombre"  placeholder="Nombre" />
+        <input type="button" id="accept" name="accept"  value="Enter" />
+      </label>
+    </div>
+  </section>
   <section id="chat">
-    <ul id="messages"></ul>
-    <form id="form" >
-      <input type="text" name="message" id="input" placeholder="Type a message" autocomplete="off">
-      <button type="submit">Enviar</button>
-    </form>
+    <div>
+      <ul id="messages"></ul>
+    </div>
+    <div id="formchat">
+      <div>
+        <fieldset>
+          <legend>Opciones</legend>
+          <label for="textColor">Color del texto
+            <input type="color" id="textColor" name="textColor" value="#000000" onchange="changeTextColor(this)" colorformat="rgba"/>
+          </label><br>
+          <label for="backgroundColor">Color de fondo
+          <input type="color" id="backgroundColor" name="backgroundColor" value="#ffffff" onchange="changeBGColor(this)" opacity rgba cmyk hsla/>
+          </label><br>
+        <label for="nombre">Nombre
+        <input type="text" id="nombre" name="nombre"  value="Anonimo" onchange="cambiarNombre(this)" disabled/>
+      </label><br>
+      </fieldset>
+      </div>
+        
+        <input type="text" name="message" id="input" placeholder="Type a message" autocomplete="off">
+        <button id="botonEnviarMensaje" type="button">Enviar</button>
+
+    </div>
+  </section>
+
+  
+  <section id="BorderlogginPanel">
+    <p>Usuarios Conectados</p>
+    <section id="logginPanel">
+
+    </section>
+  </section>
+<script>
+
+const inputMessage = document.getElementById("input");
+const idNombre = document.getElementById("nombre");
+var nombre = "Anonimo"
+
+      function changeTextColor(e){
+      console.log(e.value)
+      console.log("textColor",e.value)
+      inputMessage.style.color= e.value
+      
+    }
+
+    function changeBGColor(e){
+      console.log("BGColor",e.value)
+      inputMessage.style.backgroundColor= e.value
+    }
+
+    function ingresar(){
+      
+    }
+
+
+    
+    </script>
   </section>
 </body>
 </html>
